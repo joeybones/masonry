@@ -96,9 +96,71 @@
       var $bricks = this._filterFindBricks( $elems )
         .css({ position: 'absolute' })
         .addClass('masonry-brick');
+
+      if (this.options.pinned) {
+        this.$pinned = $elems.filter( this.options.pinned.selector );
+        $bricks = this._addPinnedBricks( $bricks );
+      }
+
       return $bricks;
     },
-    
+
+    _addPinnedBricks: function( $elems ) {
+      var len = $elems.length;
+      var $pinnedMap = this._generatePinnedMap( len );
+      
+      $elems = $elems.not( this.$pinned );
+      var arr = $elems.get();
+
+      len = $pinnedMap.max + 1 || len;
+
+      for (var i = 0; i < len; i++) {
+        if ($pinnedMap.hasOwnProperty( i )) {
+          if(arr[ i ]) {
+            arr.splice( i, 0, $pinnedMap[ i ].get( 0 ) );
+          }
+          else {
+            arr[ i ] = $pinnedMap[ i ].get( 0 );
+          }
+        }
+      }
+
+      return $(arr);
+    },
+
+    _generatePinnedMap: function( max ) {
+      var map = {};
+
+      function find( start ) {
+        var overflow = false;
+        var num = (start >= max) ? max - 1 : start;
+
+        while (num < max || overflow) {
+          if (!map.hasOwnProperty(num)) {
+            if (overflow) {
+              map.max  = num;
+              overflow = false;
+            }
+            return num;
+          }
+
+          num++;
+          overflow = (num >= max);
+        }
+
+        return num;
+      }
+
+      var sequenceAttr = this.options.pinned.sequence;
+      this.$pinned.each( function() {
+        var $this = $(this);
+        var pos = (sequenceAttr) ? $this.attr( sequenceAttr ) : max;
+        map[ find( pos - 1 ) ] = $this;
+      });
+
+      return map;
+    },
+   
     // sets up widget
     _create : function( options ) {
       
@@ -270,13 +332,21 @@
 
       // get the minimum Y value from the columns
       var minimumY = Math.min.apply( Math, groupY ),
-          shortCol = 0;
-      
+          shortCol = 0,
+          pinnedColumn = (this.options.pinned && this.options.pinned.column) ? $brick.attr( this.options.pinned.column ) : false;
+
+      // force the column if specified
+      if (pinnedColumn) {
+        shortCol = (pinnedColumn > this.cols) ? this.cols - 1 : pinnedColumn - 1;
+        minimumY = groupY[ shortCol ];
+        len = groupY.length;
+      } else {
       // Find index of short column, the first from the left
-      for (var i=0, len = groupY.length; i < len; i++) {
-        if ( groupY[i] === minimumY ) {
-          shortCol = i;
-          break;
+        for (var i=0, len = groupY.length; i < len; i++) {
+          if ( groupY[i] === minimumY ) {
+            shortCol = i;
+            break;
+          }
         }
       }
 
